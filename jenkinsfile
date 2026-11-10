@@ -1,0 +1,59 @@
+pipeline{
+    agent any 
+
+    enviroment{
+        COMPOSE_PROJECT_NAME='pmng'
+        COMPOSE_FILE='docker-compose.yml'
+        ENV_FILE=credentials('pmng_env')
+    }
+
+    stages{
+        stage('Parar servicio'){
+            steps{
+                echo 'Parando contenedores...'
+                sh '''
+                docker-compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} down
+                '''
+            }
+        }
+        stage('Eliminar imagenes'){
+            steps{
+                echo 'Eliminando imagenes antiguas...'
+                sh '''
+                IMAGES=$(docker compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} config --images | sort -u)
+
+                for IMAGE in $IMAGES; do
+                    Echo "Eliminando imagen: $IMAGE"
+                    docker rmi ""$IMAGE" || true
+                done
+                '''
+            }
+        }
+        stage('Construir imagenes'){
+            steps{
+                echo 'Construyendo imagenes...'
+                sh '''
+                docker-compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} build --no-cache
+                '''
+            }
+        }
+        stage('Levantar servicios'){
+            steps{
+                echo 'Levantando contenedores...'
+                sh '''
+                docker-compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d
+                '''
+            }
+        }
+
+    }
+
+    post{
+        success {
+            echo 'Ejecucion del piepline finalizada con exito'
+        }
+        failure {
+            echo 'Error dentro del pipeline finalizado con errores. favor de revisar el log para mas detalles'
+        }
+    }
+}
