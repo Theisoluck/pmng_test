@@ -14,6 +14,12 @@ pipeline {
                 sh '''
                     docker compose -p ${COMPOSE_PROJECT_NAME} \
                     -f ${COMPOSE_FILE} --env-file ${ENV_FILE} down
+
+                    # Contenedores de la app de versiones anteriores del compose (huerfanos).
+                    # pmng-mysql no se toca: es la base de datos.
+                    for C in pmng-back pmng-cliente pmng-services4; do
+                        docker rm -f "$C" 2>/dev/null || true
+                    done
                 '''
             }
         }
