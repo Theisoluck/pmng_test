@@ -1,59 +1,68 @@
-pipeline{
-    agent any 
+pipeline {
+    agent any
 
-    enviroment{
-        COMPOSE_PROJECT_NAME='pmng'
-        COMPOSE_FILE='docker-compose.yml'
-        ENV_FILE=credentials('pmng_env')
+    environment {
+        COMPOSE_PROJECT_NAME = 'pmng'
+        COMPOSE_FILE = 'docker-compose.yml'
+        ENV_FILE = credentials('pmng_env')
     }
 
-    stages{
-        stage('Parar servicio'){
-            steps{
+    stages {
+        stage('Parar servicio') {
+            steps {
                 echo 'Parando contenedores...'
                 sh '''
-                docker-compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} down
+                    docker compose -p ${COMPOSE_PROJECT_NAME} \
+                    -f ${COMPOSE_FILE} --env-file ${ENV_FILE} down
                 '''
             }
         }
-        stage('Eliminar imagenes'){
-            steps{
+
+        stage('Eliminar imagenes') {
+            steps {
                 echo 'Eliminando imagenes antiguas...'
                 sh '''
-                IMAGES=$(docker compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} config --images | sort -u)
+                    IMAGES=$(docker compose -p ${COMPOSE_PROJECT_NAME} \
+                    -f ${COMPOSE_FILE} --env-file ${ENV_FILE} config --images | sort -u)
 
-                for IMAGE in $IMAGES; do
-                    Echo "Eliminando imagen: $IMAGE"
-                    docker rmi ""$IMAGE" || true
-                done
+                    for IMAGE in $IMAGES; do
+                        echo "Eliminando imagen: $IMAGE"
+                        docker rmi "$IMAGE" || true
+                    done
                 '''
             }
         }
-        stage('Construir imagenes'){
-            steps{
+
+        stage('Construir imagenes') {
+            steps {
                 echo 'Construyendo imagenes...'
                 sh '''
-                docker-compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} build --no-cache
+                    docker compose -p ${COMPOSE_PROJECT_NAME} \
+                    -f ${COMPOSE_FILE} --env-file ${ENV_FILE} build --no-cache
                 '''
             }
         }
-        stage('Levantar servicios'){
-            steps{
+
+        stage('Levantar servicios') {
+            steps {
                 echo 'Levantando contenedores...'
                 sh '''
-                docker-compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d
+                    # La red es externa en docker-compose.yml: se crea si aun no existe
+                    docker network inspect pmng-net >/dev/null 2>&1 || docker network create pmng-net
+
+                    docker compose -p ${COMPOSE_PROJECT_NAME} \
+                    -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d
                 '''
             }
         }
-
     }
 
-    post{
+    post {
         success {
-            echo 'Ejecucion del piepline finalizada con exito'
+            echo 'Ejecucion del pipeline finalizada con exito.'
         }
         failure {
-            echo 'Error dentro del pipeline finalizado con errores. favor de revisar el log para mas detalles'
+            echo 'Error en el pipeline. Revisar los logs para mas detalles.'
         }
     }
 }
